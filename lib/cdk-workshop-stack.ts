@@ -1,22 +1,34 @@
-// import * as cdk from 'aws-cdk-lib'; - import given by cdkworkshop
-import { Duration, Stack, StackProps } from 'aws-cdk-lib';
-import { Construct } from 'constructs';
+import * as cdk from 'aws-cdk-lib';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as apigw from 'aws-cdk-lib/aws-apigateway';
-export class CdkWorkshopStack extends Stack {
-  constructor(scope: Construct, id: string, props?: StackProps) {
+import { HitCounter } from './hitcounter';
+import { TableViewer } from 'cdk-dynamo-table-viewer'
+
+export class CdkWorkshopStack extends cdk.Stack {
+  constructor(scope: cdk.App, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    // defines an AWS Lambda resource
     const hello = new lambda.Function(this, 'HelloHandler', {
-      runtime: lambda.Runtime.NODEJS_14_X,    // execution environment
-      code: lambda.Code.fromAsset('lambda'),  // code loaded from "lambda" directory
-      handler: 'hello.handler'                // file is "hello", function is "handler"
+      runtime: lambda.Runtime.NODEJS_14_X,
+      code: lambda.Code.fromAsset('lambda'),
+      handler: 'hello.handler'
     });
 
-    // defines an API Gateway REST API resource backed by out "hello" function.
-    new apigw.LambdaRestApi(this, 'Endpoint', {
-      handler: hello
+    const helloWithCounter = new HitCounter(this, 'HelloHitCounter', {
+      downstream: hello
     });
+
+    // defines an API Gateway REST API resource backed by our "hello" function.
+    new apigw.LambdaRestApi(this, 'Endpoint', {
+      handler: helloWithCounter.handler
+    });
+
+    // creates the new table with these specifications
+    new TableViewer(this, 'ViewHitCounter', {
+      title: "Hello Hits",
+      table: helloWithCounter.table,
+      // sorts in descending order by hits
+      sortBy: '-hits'
+    })
   }
 }
